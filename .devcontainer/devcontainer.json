@@ -1,0 +1,57 @@
+{
+	"name": "go-tensor-dev",
+	"remoteUser": "root",
+	"updateRemoteUserUID": true,
+	"build": {
+		"dockerfile": "Dockerfile",
+		"args": {
+			"TensorFlowVersion": "2.13.0",
+			"GoCvVersion": "0.36.1"
+		}
+	},
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"editor.formatOnSave": true,
+				"editor.codeActionsOnSave": {
+					"source.organizeImports": true
+				},
+				"editor.rulers": [
+					80
+				],
+				"[go]": {
+					"editor.snippetSuggestions": "none",
+					"editor.defaultFormatter": "golang.go"
+				},
+				"[go][go.mod]": {
+					"editor.codeActionsOnSave": {
+						"source.organizeImports": "explicit"
+					}
+				},
+				"go.lintTool": "golangci-lint",
+				"go.lintFlags": [
+					"--enable-all",
+					"--new"
+				],
+				"go.toolsManagement.autoUpdate": true,
+				"go.enableCodeLens": {
+					"runtest": true
+				}
+			},
+			"extensions": [
+				"golang.go",
+			]
+		}
+	},
+	"features": {
+		"ghcr.io/devcontainers/features/git:1": {},
+		"ghcr.io/guiyomh/features/golangci-lint:0": {},
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {
+			"version": "latest"
+		}
+	},
+	"runArgs": [
+		// "--gpus=all"
+	],
+	"postCreateCommand": "go env -w GOFLAGS=\"-buildvcs=false\" CGO_CFLAGS=\"-I/usr/local/include/tensorflow\" CGO_LDFLAGS=\"-L/usr/local/lib\""
+}
