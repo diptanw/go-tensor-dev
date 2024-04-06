@@ -10,6 +10,7 @@ require (
 
 require (
 	github.com/aws/aws-sdk-go v1.38.20 // indirect
+	github.com/hybridgroup/mjpeg v0.0.0-20140228234708-4680f319790e // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/u2takey/go-utils v0.3.1 // indirect
 	google.golang.org/protobuf v1.32.0 // indirect

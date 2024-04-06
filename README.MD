@@ -1,7 +1,7 @@
 # Go Tensor development environment
 
-This repository provides a Go development container environment for working TensorFlow, and OpenCV. 
-The aim is to have the devcontainer build all components for ARM-based processors like Apple Silicon 
+This repository provides a Go development container environment for working TensorFlow, and OpenCV.
+The aim is to have the devcontainer build all components for ARM-based processors like Apple Silicon
 or Raspberry Pi. GPU support is not available.
 
 ## Prerequisites
@@ -31,3 +31,30 @@ Here are some example steps to get started:
 2. Import the necessary packages, such as `github.com/tensorflow/tensorflow` for TensorFlow and `gocv.io/x/gocv` for OpenCV.
 3. Write your Go code to perform machine learning or computer vision tasks using TensorFlow and OpenCV.
 4. Build and run your Go program using the `go` command. For example, you can run `go run src/your_file.go` to execute your code.
+
+### Webcam streaming
+
+Due to the differences in how MacOS/Windows and Linux systems handle devices, it's difficult to mount a video device to a Linux container from the host OS. To capture webcam video and process it with OpenCV, it first needs to be FFMPEG streamed.
+
+1. Install FFMPEG using Homebrew:
+
+```shell
+brew install ffmpeg
+```
+
+2. Start the stream using FFMPEG:
+
+```shell
+ffmpeg \
+  -f avfoundation \
+  -pix_fmt yuyv422 \
+  -video_size 640x480 \
+  -framerate 30 \
+  -i "0:0" -ac 2 \
+  -vf format=yuyv422 \
+  -vcodec libx264 -maxrate 2000k \
+  -bufsize 2000k -acodec aac -ar 44100 -b:a 128k \
+  -f mpegts udp://127.0.0.1:9988
+```
+
+3. Run demo app in the container and check proccessed output at <http://localhost:8080>

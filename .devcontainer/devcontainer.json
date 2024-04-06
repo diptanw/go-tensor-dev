@@ -50,8 +50,12 @@
 			"version": "latest"
 		}
 	},
+	"appPort": [
+		"9988:9988/udp", // Inbound FFMPEG video stream.
+		"8080:8080" // Captured and processed video stream by OpenCV.
+	],
 	"runArgs": [
-		// "--gpus=all"
+		// "--add-host=host.docker.internal:host-gateway"
 	],
 	"postCreateCommand": "go env -w GOFLAGS=\"-buildvcs=false\" CGO_CFLAGS=\"-I/usr/local/include/tensorflow\" CGO_LDFLAGS=\"-L/usr/local/lib\""
 }
