@@ -1,7 +1,10 @@
 package main
 
 import (
+	"errors"
 	"flag"
+	"image"
+	"image/color"
 	"log"
 	"net/http"
 	"time"
@@ -10,54 +13,68 @@ import (
 	tf "github.com/wamuir/graft/tensorflow"
 	"github.com/wamuir/graft/tensorflow/op"
 	"gocv.io/x/gocv"
-
-	_ "github.com/u2takey/ffmpeg-go"
+	"gocv.io/x/gocv/contrib"
 )
 
 func main() {
-	printVersion()
+	var captureURL string
 
-	var streamURL string
-
-	flag.StringVar(&streamURL, "url", "udp://@:9988", "vedeo capture stream URL")
+	flag.StringVar(&captureURL, "url", "udp://@:9988", "video capture stream URL")
 	flag.Parse()
 
-	if streamURL == "" {
+	if captureURL == "" {
 		flag.Usage()
 
 		return
 	}
 
-	rtp, err := gocv.OpenVideoCaptureWithAPI(streamURL, gocv.VideoCaptureFFmpeg)
+	printVersion()
+
+	rtp, err := gocv.OpenVideoCaptureWithAPI(captureURL, gocv.VideoCaptureFFmpeg)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	defer rtp.Close()
 
-	log.Printf("Capturing from %s\n", streamURL)
+	log.Printf("Capture started from %s\n", captureURL)
 
-	stream := mjpeg.NewStream()
+	stream, err := trackObject(rtp)
+	if err != nil {
+		log.Panic(err)
+	}
 
-	go func() {
-		img := gocv.NewMat()
-		defer img.Close()
+	log.Println("Tracking started")
 
-		for {
-			if ok := rtp.Read(&img); !ok {
-				return
-			}
+	if err := serverHTTP(stream); err != nil {
+		log.Panic(err)
+	}
+}
 
-			if img.Empty() {
-				continue
-			}
+func printVersion() {
+	scope := op.NewScope()
+	ver := op.Const(scope, tf.Version())
 
-			buf, _ := gocv.IMEncode(".jpg", img)
-			stream.UpdateJPEG(buf.GetBytes())
-			buf.Close()
-		}
-	}()
+	graph, err := scope.Finalize()
+	if err != nil {
+		log.Panic(err)
+	}
 
+	sess, err := tf.NewSession(graph, nil)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	output, err := sess.Run(nil, []tf.Output{ver}, nil)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	log.Printf("TensorFlow version %s\n", output[0].Value())
+	log.Printf("OpenCV version %s\n", gocv.Version())
+}
+
+func serverHTTP(stream *mjpeg.Stream) error {
 	http.Handle("/", stream)
 
 	server := &http.Server{
@@ -68,30 +85,67 @@ func main() {
 
 	log.Println("Processed at http://localhost:8080/")
 
-	if err := server.ListenAndServe(); err != nil {
-		panic(err)
-	}
+	return server.ListenAndServe()
 }
 
-func printVersion() {
-	scope := op.NewScope()
-	ver := op.Const(scope, tf.Version())
+func trackObject(vc *gocv.VideoCapture) (*mjpeg.Stream, error) {
+	stream := mjpeg.NewStream()
+	mat := gocv.NewMat()
 
-	graph, err := scope.Finalize()
+	readImg(&mat, vc)
+
+	initImg, err := mat.ToImage()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	sess, err := tf.NewSession(graph, nil)
-	if err != nil {
-		panic(err)
+	// Crop to the middle of the image (face tracking).
+	crop := image.Rect(
+		initImg.Bounds().Max.X/2-100,
+		initImg.Bounds().Max.Y/2-100,
+		initImg.Bounds().Max.X/2+100,
+		initImg.Bounds().Max.Y/2+100,
+	)
+
+	tracker := contrib.NewTrackerKCF()
+	if !tracker.Init(mat, crop) {
+		return nil, errors.New("cannot initialize tracker")
 	}
 
-	output, err := sess.Run(nil, []tf.Output{ver}, nil)
-	if err != nil {
-		panic(err)
-	}
+	go func() {
+		defer mat.Close()
+		defer tracker.Close()
 
-	log.Printf("TensorFlow version %s\n", output[0].Value())
-	log.Printf("OpenCV version %s\n", gocv.Version())
+		blue := color.RGBA{0, 0, 255, 0}
+
+		for {
+			readImg(&mat, vc)
+
+			rect, _ := tracker.Update(mat)
+
+			gocv.Rectangle(&mat, rect, blue, 1)
+
+			buf, _ := gocv.IMEncode(".jpg", mat)
+			stream.UpdateJPEG(buf.GetBytes())
+			buf.Close()
+		}
+	}()
+
+	return stream, nil
+}
+
+func readImg(img *gocv.Mat, cap *gocv.VideoCapture) {
+	for {
+		if ok := cap.Read(img); !ok {
+			log.Println("cannot read capture")
+
+			return
+		}
+
+		if img.Empty() {
+			continue
+		}
+
+		return
+	}
 }

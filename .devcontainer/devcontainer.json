@@ -21,7 +21,6 @@
 				],
 				"[go]": {
 					"editor.snippetSuggestions": "none",
-					"editor.defaultFormatter": "golang.go"
 				},
 				"[go][go.mod]": {
 					"editor.codeActionsOnSave": {
